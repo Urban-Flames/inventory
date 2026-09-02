@@ -105,6 +105,28 @@ export const initialMainStockData: MainStockItem[] = [
     updatedAt: today,
   },
 
+  // ===== BACK FILLET (NEW - ADDED) =====
+  {
+    id: 'ms-19',
+    name: 'Back Fillet',
+    category: 'meat',
+    usageType: 'production_raw',
+    substituteFor: 'Full Chicken',
+    unit: 'ctns',
+    openingStock: 0,
+    addedStock: 0,
+    issuedToProduction: 0,
+    issuedToKitchen: 0,
+    closingStock: 0,
+    quantityInStock: 0,
+    reorderLevel: 10,
+    grossWeightIssued: 0,
+    wasteWeight: 0,
+    netYieldWeight: 0,
+    portionsYielded: 0,
+    updatedAt: today,
+  },
+
   // MEAT ITEMS
   {
     id: 'ms-06',
@@ -252,7 +274,7 @@ export const initialMainStockData: MainStockItem[] = [
     id: 'ms-12',
     name: 'Cheddar Cheese',
     category: 'bakery_dairy',
-    usageType: 'direct_sale',  // Production disabled
+    usageType: 'direct_sale',
     substituteFor: 'Mozzarella Cheese',
     unit: 'packs',
     openingStock: 0,

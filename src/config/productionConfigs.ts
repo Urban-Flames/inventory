@@ -18,6 +18,12 @@ export const PRODUCTION_CONFIGS: Record<string, { label: string; key: string }[]
   'Chicken Thigh': [
     { label: 'Chicken Shawarma', key: 'chicken_shawarma' },
   ],
+  // NEW: Back Fillet
+  'Back Fillet': [
+    { label: 'Beef Shawarma', key: 'beef_shawarma' },
+    { label: 'Beef Assorted', key: 'beef_assorted' },
+    { label: 'Beef Khebab', key: 'beef_khebab' },
+  ],
   'Mozzarella Cheese': [
     { label: 'Mozzarella Portions', key: 'mozzarella_portions' },
   ],
@@ -50,36 +56,36 @@ export const getProductionConfig = (itemName: string) => {
 };
 
 // Portion conversion helpers
-// These define how many portions come from 1 unit of the item
 export const PORTION_CONVERSIONS: Record<string, number> = {
-  'Chicken Wings': 40,    // 1 carton = 40 portions
-  'Full Chicken': 8,      // 1 carton = 8 portions
-  'Chicken Thigh': 12,    // 1 carton = 12 portions
-  'Chicken Breast': 10,   // 1 carton = 10 portions
-  'Lamb Chops': 0,        // Weight-based, portions calculated per kg
-  'Pork Chops': 0,        // Weight-based, portions calculated per kg
-  'Meat Minced': 0,       // Weight-based, portions calculated per kg
-  'Chicken Minced': 0,    // Weight-based, portions calculated per kg
-  'Mozzarella Cheese': 0, // Weight-based, portions calculated per kg
+  'Chicken Wings': 40,
+  'Full Chicken': 8,
+  'Chicken Thigh': 12,
+  'Chicken Breast': 10,
+  'Lamb Chops': 0,
+  'Pork Chops': 0,
+  'Meat Minced': 0,
+  'Chicken Minced': 0,
+  'Mozzarella Cheese': 0,
+  // NEW: Back Fillet
+  'Back Fillet': 0, // Weight-based, portions calculated per kg
 };
 
 export const getPortionsPerUnit = (itemName: string): number => {
   return PORTION_CONVERSIONS[itemName] || 0;
 };
 
-// Helper to determine if an item uses weight-based portioning
 export const isWeightBasedPortioning = (itemName: string): boolean => {
   const weightBasedItems = [
     'Lamb Chops',
     'Pork Chops',
     'Meat Minced',
     'Chicken Minced',
-    'Mozzarella Cheese'
+    'Mozzarella Cheese',
+    'Back Fillet', // NEW
   ];
   return weightBasedItems.includes(itemName);
 };
 
-// Helper to get portion label for weight-based items
 export const getPortionLabel = (itemName: string): string => {
   const labels: Record<string, string> = {
     'Lamb Chops': 'Lamb Chops Portions (per kg)',
@@ -87,6 +93,7 @@ export const getPortionLabel = (itemName: string): string => {
     'Meat Minced': 'Meat Patty Portions (per kg)',
     'Chicken Minced': 'Chicken Patty Portions (per kg)',
     'Mozzarella Cheese': 'Mozzarella Portions (per block)',
+    'Back Fillet': 'Back Fillet Portions (per ctns)', // NEW
   };
   return labels[itemName] || 'Portions';
 };
