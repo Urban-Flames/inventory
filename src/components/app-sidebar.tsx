@@ -10,7 +10,7 @@ import {
   Factory,
   FileBarChart,
   FileSpreadsheet,
-  FileText,  // ← ADD THIS
+  FileText,
   ChevronRight,
   UtensilsCrossed,
   Wine,
@@ -24,6 +24,8 @@ import {
   CookingPot,
   ClipboardList,
   LinkIcon,
+  Building2,
+  ShoppingBag, // ← ADD THIS IMPORT
 } from "lucide-react"
 
 import {
@@ -557,6 +559,46 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* SUPPLIERS SECTION */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Suppliers</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === "/suppliers"}
+                tooltip="Suppliers"
+                render={
+                  <Link href="/suppliers">
+                    <Building2 className="h-4 w-4" />
+                    <span>Supplier Accounts</span>
+                  </Link>
+                }
+              />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+
+
+{/* EXPENSES SECTION */}
+<SidebarGroup>
+  <SidebarGroupLabel>Expenses</SidebarGroupLabel>
+  <SidebarMenu>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={pathname === "/expenses"}
+        tooltip="Expenses"
+        render={
+          <Link href="/expenses">
+            <ShoppingBag className="h-4 w-4" />
+            <span>Expense Management</span>
+          </Link>
+        }
+      />
+    </SidebarMenuItem>
+  </SidebarMenu>
+</SidebarGroup>
 
         {/* STOCK & PRODUCTION (Original - keep for now) */}
         <SidebarGroup>
