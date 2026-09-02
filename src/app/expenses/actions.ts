@@ -1,0 +1,437 @@
+// src/app/expenses/actions.ts
+'use server';
+
+import { sql } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
+import { expenseSuppliers, commonExpenseItems } from '@/data/expenseSuppliers';
+
+// Initialize expense suppliers
+export async function initializeExpenseSuppliers() {
+  try {
+    await sql`BEGIN`;
+
+    for (const supplier of expenseSuppliers) {
+      const existing = await sql`
+        SELECT id FROM expense_suppliers WHERE id = ${supplier.id}
+      `;
+
+      if (existing.length === 0) {
+        await sql`
+          INSERT INTO expense_suppliers (
+            id, name, code, category, contact_person, phone, email,
+            payment_terms, credit_days, is_custom
+          ) VALUES (
+            ${supplier.id}, ${supplier.name}, ${supplier.code}, 
+            ${supplier.category}, ${supplier.contactPerson || null}, 
+            ${supplier.phone || null}, ${supplier.email || null},
+            ${supplier.paymentTerms || 'cheque'}, ${supplier.creditDays || 0},
+            false
+          )
+        `;
+
+        // Add common items for this supplier
+        for (const item of commonExpenseItems) {
+          await sql`
+            INSERT INTO expense_items (
+              supplier_id, item_name, unit, category
+            ) VALUES (
+              ${supplier.id}, ${item.itemName}, ${item.unit}, ${item.category}
+            )
+          `;
+        }
+      }
+    }
+
+    await sql`COMMIT`;
+    return { success: true, message: 'Expense suppliers initialized successfully' };
+  } catch (error) {
+    await sql`ROLLBACK`;
+    console.error('Error initializing expense suppliers:', error);
+    return { success: false, message: 'Failed to initialize expense suppliers' };
+  }
+}
+
+// Add new expense supplier (custom)
+export async function addExpenseSupplier(data: {
+  name: string;
+  category: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  paymentTerms?: 'cash' | 'cheque' | 'credit';
+  creditDays?: number;
+}) {
+  try {
+    // Generate a unique ID
+    const id = data.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now().toString().slice(-4);
+    const code = 'CUS-' + Date.now().toString().slice(-6);
+
+    await sql`
+      INSERT INTO expense_suppliers (
+        id, name, code, category, contact_person, phone, email,
+        payment_terms, credit_days, is_custom
+      ) VALUES (
+        ${id}, ${data.name}, ${code}, 
+        ${data.category || 'Other'}, ${data.contactPerson || null}, 
+        ${data.phone || null}, ${data.email || null},
+        ${data.paymentTerms || 'cheque'}, ${data.creditDays || 0},
+        true
+      )
+    `;
+
+    revalidatePath('/expenses');
+    
+    return { 
+      success: true, 
+      data: { id, name: data.name, code },
+      message: `Supplier "${data.name}" added successfully` 
+    };
+  } catch (error) {
+    console.error('Error adding expense supplier:', error);
+    return { success: false, message: 'Failed to add supplier' };
+  }
+}
+
+// Add expense item to a supplier
+export async function addExpenseItem(
+  supplierId: string,
+  data: {
+    itemName: string;
+    unit: string;
+    unitPrice: number;
+    category?: string;
+    notes?: string;
+  }
+) {
+  try {
+    const result = await sql`
+      INSERT INTO expense_items (
+        supplier_id, item_name, unit, unit_price, category, notes
+      ) VALUES (
+        ${supplierId}, ${data.itemName}, ${data.unit}, 
+        ${data.unitPrice || 0}, ${data.category || null}, ${data.notes || null}
+      )
+      RETURNING *
+    `;
+
+    revalidatePath('/expenses');
+    return { 
+      success: true, 
+      data: result[0], 
+      message: 'Item added successfully' 
+    };
+  } catch (error) {
+    console.error('Error adding expense item:', error);
+    return { success: false, message: 'Failed to add item' };
+  }
+}
+
+// Get all expense suppliers (including custom)
+export async function getExpenseSuppliers() {
+  try {
+    const suppliers = await sql`
+      SELECT * FROM expense_suppliers ORDER BY name
+    `;
+
+    const items = await sql`
+      SELECT * FROM expense_items ORDER BY supplier_id, item_name
+    `;
+
+    const itemsBySupplier: Record<string, any[]> = {};
+    for (const item of items) {
+      if (!itemsBySupplier[item.supplier_id]) {
+        itemsBySupplier[item.supplier_id] = [];
+      }
+      itemsBySupplier[item.supplier_id].push({
+        id: item.id,
+        itemName: item.item_name,
+        unit: item.unit,
+        unitPrice: Number(item.unit_price),
+        category: item.category,
+        notes: item.notes
+      });
+    }
+
+    const result = suppliers.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      category: s.category,
+      contactPerson: s.contact_person,
+      phone: s.phone,
+      email: s.email,
+      address: s.address,
+      paymentTerms: s.payment_terms || 'cheque',
+      creditDays: s.credit_days || 0,
+      isCustom: s.is_custom || false,
+      items: itemsBySupplier[s.id] || [],
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error fetching expense suppliers:', error);
+    return { success: false, data: null, message: 'Failed to fetch suppliers' };
+  }
+}
+
+// Save expense transaction
+export async function saveExpenseTransaction(data: any) {
+  try {
+    await sql`BEGIN`;
+
+    const transaction = await sql`
+      INSERT INTO expense_transactions (
+        supplier_id, supplier_name, transaction_date, item_name,
+        quantity, unit, unit_price, total_amount, amount_paid,
+        balance, payment_method, cheque_number, cheque_issue_date,
+        cheque_clearing_date, cheque_bank, purchased_by, sales_date,
+        notes, status
+      ) VALUES (
+        ${data.supplierId}, ${data.supplierName}, ${data.transactionDate},
+        ${data.itemName}, ${data.quantity}, ${data.unit},
+        ${data.unitPrice}, ${data.totalAmount}, ${data.amountPaid || 0},
+        ${data.balance || data.totalAmount}, ${data.paymentMethod || 'cheque'},
+        ${data.chequeNumber || null}, ${data.chequeIssueDate || null},
+        ${data.chequeClearingDate || null}, ${data.chequeBank || null},
+        ${data.purchasedBy || null}, ${data.salesDate || null},
+        ${data.notes || null}, ${data.status || 'pending'}
+      )
+      RETURNING *
+    `;
+
+    // If cheque was issued, record it
+    if (data.paymentMethod === 'cheque' && data.chequeNumber && data.chequeIssueDate) {
+      await sql`
+        INSERT INTO expense_payments (
+          supplier_id, supplier_name, payment_date, amount,
+          payment_method, cheque_number, cheque_issue_date,
+          cheque_clearing_date, cheque_bank, notes
+        ) VALUES (
+          ${data.supplierId}, ${data.supplierName}, ${data.transactionDate},
+          ${data.amountPaid || data.totalAmount}, 'cheque',
+          ${data.chequeNumber}, ${data.chequeIssueDate},
+          ${data.chequeClearingDate || null}, ${data.chequeBank || null},
+          ${data.notes || null}
+        )
+      `;
+    }
+
+    await sql`COMMIT`;
+    revalidatePath('/expenses');
+    revalidatePath('/expenses/staff');
+    
+    return { 
+      success: true, 
+      data: transaction[0],
+      message: 'Expense transaction saved successfully' 
+    };
+  } catch (error) {
+    await sql`ROLLBACK`;
+    console.error('Error saving expense transaction:', error);
+    return { success: false, message: 'Failed to save expense transaction' };
+  }
+}
+
+// Get expense transactions
+export async function getExpenseTransactions(
+  supplierId?: string,
+  staffName?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  try {
+    let query = sql`
+      SELECT * FROM expense_transactions 
+      WHERE 1=1
+    `;
+
+    if (supplierId) {
+      query = sql`
+        ${query} AND supplier_id = ${supplierId}
+      `;
+    }
+
+    if (staffName) {
+      query = sql`
+        ${query} AND purchased_by = ${staffName}
+      `;
+    }
+
+    if (startDate) {
+      query = sql`
+        ${query} AND transaction_date >= ${startDate}
+      `;
+    }
+
+    if (endDate) {
+      query = sql`
+        ${query} AND transaction_date <= ${endDate}
+      `;
+    }
+
+    query = sql`
+      ${query} ORDER BY transaction_date DESC, created_at DESC
+    `;
+
+    const transactions = await query;
+
+    const result = transactions.map((t: any) => ({
+      id: t.id,
+      supplierId: t.supplier_id,
+      supplierName: t.supplier_name,
+      transactionDate: t.transaction_date,
+      itemName: t.item_name,
+      quantity: Number(t.quantity),
+      unit: t.unit,
+      unitPrice: Number(t.unit_price),
+      totalAmount: Number(t.total_amount),
+      amountPaid: Number(t.amount_paid),
+      balance: Number(t.balance),
+      paymentMethod: t.payment_method,
+      chequeNumber: t.cheque_number,
+      chequeIssueDate: t.cheque_issue_date,
+      chequeClearingDate: t.cheque_clearing_date,
+      chequeBank: t.cheque_bank,
+      purchasedBy: t.purchased_by,
+      salesDate: t.sales_date,
+      notes: t.notes,
+      status: t.status,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error fetching expense transactions:', error);
+    return { success: false, data: null, message: 'Failed to fetch transactions' };
+  }
+}
+
+// Get staff expense summary
+export async function getStaffExpenseSummary() {
+  try {
+    const summary = await sql`
+      SELECT 
+        purchased_by as staff_name,
+        COALESCE(SUM(total_amount), 0) as total_purchases,
+        COALESCE(SUM(amount_paid), 0) as total_paid,
+        COALESCE(SUM(balance), 0) as balance,
+        COUNT(*) as transaction_count,
+        MAX(transaction_date) as last_transaction_date
+      FROM expense_transactions
+      WHERE purchased_by IS NOT NULL
+      GROUP BY purchased_by
+      ORDER BY purchased_by
+    `;
+
+    const result = summary.map((s: any) => ({
+      staffName: s.staff_name,
+      totalPurchases: Number(s.total_purchases),
+      totalPaid: Number(s.total_paid),
+      balance: Number(s.balance),
+      transactionCount: Number(s.transaction_count),
+      lastTransactionDate: s.last_transaction_date
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error fetching staff summary:', error);
+    return { success: false, data: null, message: 'Failed to fetch staff summary' };
+  }
+}
+
+// Get expense supplier summary
+export async function getExpenseSupplierSummary() {
+  try {
+    const summary = await sql`
+      SELECT 
+        supplier_id,
+        supplier_name,
+        COALESCE(SUM(total_amount), 0) as total_purchases,
+        COALESCE(SUM(amount_paid), 0) as total_paid,
+        COALESCE(SUM(balance), 0) as balance,
+        COUNT(*) as transaction_count,
+        MAX(transaction_date) as last_transaction_date
+      FROM expense_transactions
+      GROUP BY supplier_id, supplier_name
+      ORDER BY supplier_name
+    `;
+
+    const result = summary.map((s: any) => ({
+      supplierId: s.supplier_id,
+      supplierName: s.supplier_name,
+      totalPurchases: Number(s.total_purchases),
+      totalPaid: Number(s.total_paid),
+      balance: Number(s.balance),
+      transactionCount: Number(s.transaction_count),
+      lastTransactionDate: s.last_transaction_date
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error fetching expense supplier summary:', error);
+    return { success: false, data: null, message: 'Failed to fetch expense supplier summary' };
+  }
+}
+
+// Delete expense supplier (only custom ones)
+export async function deleteExpenseSupplier(supplierId: string) {
+  try {
+    // Check if it's a custom supplier
+    const supplier = await sql`
+      SELECT is_custom FROM expense_suppliers WHERE id = ${supplierId}
+    `;
+
+    if (supplier.length === 0) {
+      return { success: false, message: 'Supplier not found' };
+    }
+
+    if (!supplier[0].is_custom) {
+      return { success: false, message: 'Cannot delete default suppliers' };
+    }
+
+    await sql`
+      DELETE FROM expense_suppliers WHERE id = ${supplierId}
+    `;
+
+    revalidatePath('/expenses');
+    return { success: true, message: 'Supplier deleted successfully' };
+  } catch (error) {
+    console.error('Error deleting supplier:', error);
+    return { success: false, message: 'Failed to delete supplier' };
+  }
+}
+
+// Delete expense item
+export async function deleteExpenseItem(itemId: number) {
+  try {
+    await sql`
+      DELETE FROM expense_items WHERE id = ${itemId}
+    `;
+
+    revalidatePath('/expenses');
+    return { success: true, message: 'Item deleted successfully' };
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    return { success: false, message: 'Failed to delete item' };
+  }
+}
+
+// Update expense item price
+export async function updateExpenseItemPrice(itemId: number, unitPrice: number) {
+  try {
+    await sql`
+      UPDATE expense_items 
+      SET unit_price = ${unitPrice}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${itemId}
+    `;
+
+    revalidatePath('/expenses');
+    return { success: true, message: 'Price updated successfully' };
+  } catch (error) {
+    console.error('Error updating item price:', error);
+    return { success: false, message: 'Failed to update price' };
+  }
+}
