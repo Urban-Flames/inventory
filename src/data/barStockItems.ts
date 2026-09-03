@@ -14,6 +14,7 @@ export const initialBarStockData: BarDailyItem[] = [
   { id: 'b9', name: 'Soda Water', category: 'soft_drinks', unit: 'btls', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b10', name: 'Voltic Water (Large)', category: 'soft_drinks', unit: 'btls', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b11', name: 'Voltic Water (Small)', category: 'soft_drinks', unit: 'btls', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b69', name: 'BB Cocktail', category: 'soft_drinks', unit: 'btls', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
 
   // Beers & Ciders
   { id: 'b12', name: 'Club Large', category: 'beers', unit: 'btls', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
