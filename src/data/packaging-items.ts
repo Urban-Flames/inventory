@@ -34,14 +34,14 @@ export const packagingItemsData: PackagingItem[] = [
   // ============================================
   
   // Paper & Plastic Disposables
-  { id: 'pkg_12', name: 'Disposable Packaging 1', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
-  { id: 'pkg_13', name: 'Disposable Packaging 2', category: 'Disposables', unit: 'kg', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
-  { id: 'pkg_39', name: 'Disposable Packaging 3', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
-  { id: 'pkg_40', name: 'Disposable Packaging 4', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
+  { id: 'pkg_12', name: 'Disposable Spoon', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
+  { id: 'pkg_13', name: 'Disposable Fork', category: 'Disposables', unit: 'kg', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
+  { id: 'pkg_39', name: 'Disposable Cup Take Away', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
+  { id: 'pkg_40', name: 'Disposable Cup', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
   
   // Tissue & Napkins
   { id: 'pkg_15', name: 'Hand Tissue Packaging', category: 'Disposables', unit: 'kg', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
-  { id: 'pkg_17', name: 'Tissue Napkin Packaging 1', category: 'Disposables', unit: 'kg', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
+  { id: 'pkg_17', name: 'Tissue Napkin (Jumbo Tissu)', category: 'Disposables', unit: 'kg', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
   { id: 'pkg_18', name: 'Tissue Napkin Packaging 2', category: 'Disposables', unit: 'pks', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 3 },
   { id: 'pkg_37', name: 'Paper Bag', category: 'Disposables', unit: 'pcs', openingStock: 0, addedStock: 0, issuedToProduction: 0, issuedToKitchen: 0, closingStock: 0, reorderLevel: 5 },
   

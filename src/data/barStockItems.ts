@@ -50,6 +50,17 @@ export const initialBarStockData: BarDailyItem[] = [
   { id: 'b41', name: 'Baileys Irish Cream', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b42', name: 'Jagermeister', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b43', name: 'Campari', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b57', name: 'Aperol', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b58', name: 'Hendrick\'s Gin', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b59', name: 'Jack Daniel\'s', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b60', name: 'Courvoisier VSOP', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b61', name: 'Hennesey VSOP', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b62', name: 'Don Julio', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b63', name: 'Strawberry Carnival', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b64', name: 'Kasapreko Gin', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b67', name: 'Alomo Bitters', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b68', name: 'Origin Bitters', category: 'spirits', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+
 
   // Wines & Syrups
   { id: 'b44', name: 'Condor White Wine', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
@@ -60,6 +71,8 @@ export const initialBarStockData: BarDailyItem[] = [
   { id: 'b49', name: 'Grenadine Syrup', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b50', name: 'Blue Curaçao', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b51', name: 'Strawberry Syrup', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b65', name: 'Veuve Du Vernay', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+  { id: 'b66', name: 'Moscato', category: 'wines_syrups', unit: 'shots', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
 
   // Ice Cream & Mixers
   { id: 'b52', name: 'Ice Cube Pack', category: 'ice_mixers', unit: 'pks', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
