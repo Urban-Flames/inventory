@@ -10,7 +10,7 @@ import {
   CreditCard, Banknote, Wallet, Users,
   TrendingUp, TrendingDown, FileText, ShoppingBag,
   Store, User, CalendarDays, Building, PlusCircle,
-  Phone, Mail, MapPin
+  Phone, Mail, MapPin, Minus, Receipt, UserCircle
 } from 'lucide-react';
 import {
   getExpenseSuppliers,
@@ -20,7 +20,9 @@ import {
   saveExpenseTransaction,
   initializeExpenseSuppliers,
   addExpenseSupplier,
-  addExpenseItem
+  addExpenseItem,
+  updateStaffRefund,
+  getStaffTransactions
 } from './actions';
 import { expenseSuppliers } from '@/data/expenseSuppliers';
 import { ExpenseSupplier, ExpenseTransaction, ExpenseItem } from '@/types/expenses';
@@ -89,7 +91,7 @@ const TransactionCard = ({ transaction }: { transaction: ExpenseTransaction }) =
           <p className="font-medium">{formatCurrency(transaction.totalAmount)}</p>
         </div>
         <div>
-          <span className="text-gray-500">Paid</span>
+          <span className="text-gray-500">Refunded</span>
           <p className="font-medium text-green-600">{formatCurrency(transaction.amountPaid)}</p>
         </div>
         <div>
@@ -138,6 +140,15 @@ const TransactionCard = ({ transaction }: { transaction: ExpenseTransaction }) =
   );
 };
 
+// Individual expense item entry
+interface ExpenseItemEntry {
+  id: string;
+  itemName: string;
+  quantity: number;
+  amount: number;
+  notes?: string;
+}
+
 export default function ExpensesPage() {
   const [suppliers, setSuppliers] = useState<ExpenseSupplier[]>([]);
   const [transactions, setTransactions] = useState<ExpenseTransaction[]>([]);
@@ -150,9 +161,35 @@ export default function ExpensesPage() {
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [showAddVendor, setShowAddVendor] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [selectedStaffForRefund, setSelectedStaffForRefund] = useState<string | null>(null);
+  const [refundAmount, setRefundAmount] = useState<number>(0);
+  const [refundNote, setRefundNote] = useState<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [filterStaff, setFilterStaff] = useState<string>('');
+
+  // Staff views
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
+  const [staffTransactions, setStaffTransactions] = useState<ExpenseTransaction[]>([]);
+
+  // Expense items for the transaction
+  const [expenseItems, setExpenseItems] = useState<ExpenseItemEntry[]>([
+    { id: '1', itemName: '', quantity: 1, amount: 0 }
+  ]);
+  const [grandTotal, setGrandTotal] = useState<number>(0);
+
+  // Payment details
+  const [paymentDetails, setPaymentDetails] = useState({
+    paymentMethod: 'cheque' as 'cash' | 'cheque' | 'credit',
+    chequeNumber: '',
+    chequeIssueDate: '',
+    chequeClearingDate: '',
+    chequeBank: '',
+    purchasedBy: '',
+    salesDate: '',
+    notes: ''
+  });
 
   // New Vendor Form
   const [newVendor, setNewVendor] = useState({
@@ -174,29 +211,16 @@ export default function ExpensesPage() {
     notes: ''
   });
 
-  // New transaction form
-  const [newTransaction, setNewTransaction] = useState({
-    itemName: '',
-    quantity: 1,
-    unit: '',
-    unitPrice: 0,
-    totalAmount: 0,
-    amountPaid: 0,
-    balance: 0,
-    paymentMethod: 'cheque' as 'cash' | 'cheque' | 'credit',
-    chequeNumber: '',
-    chequeIssueDate: '',
-    chequeClearingDate: '',
-    chequeBank: '',
-    purchasedBy: '',
-    salesDate: '',
-    notes: ''
-  });
-
   // Load data
   useEffect(() => {
     loadData();
   }, []);
+
+  // Calculate grand total whenever expense items change
+  useEffect(() => {
+    const total = expenseItems.reduce((sum, item) => sum + (item.quantity * item.amount), 0);
+    setGrandTotal(total);
+  }, [expenseItems]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -218,7 +242,6 @@ export default function ExpensesPage() {
         setSupplierSummary(supplierSummaryResult.data);
       }
 
-      // Load all transactions
       const transactionResult = await getExpenseTransactions();
       if (transactionResult.success && transactionResult.data) {
         setTransactions(transactionResult.data);
@@ -255,6 +278,48 @@ export default function ExpensesPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Load staff transactions
+  const loadStaffTransactions = async (staffName: string) => {
+    setIsLoading(true);
+    try {
+      const result = await getStaffTransactions(staffName);
+      if (result.success && result.data) {
+        setStaffTransactions(result.data);
+        setSelectedStaff(staffName);
+      }
+    } catch (error) {
+      console.error('Error loading staff transactions:', error);
+      setMessage({ type: 'error', text: 'Failed to load staff transactions' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add a new expense item row
+  const addExpenseItemRow = () => {
+    const newId = (Math.max(...expenseItems.map(i => parseInt(i.id))) + 1).toString();
+    setExpenseItems([...expenseItems, { id: newId, itemName: '', quantity: 1, amount: 0 }]);
+  };
+
+  // Remove an expense item row
+  const removeExpenseItemRow = (id: string) => {
+    if (expenseItems.length <= 1) {
+      setMessage({ type: 'error', text: 'You must have at least one expense item' });
+      return;
+    }
+    setExpenseItems(expenseItems.filter(item => item.id !== id));
+  };
+
+  // Update expense item field
+  const updateExpenseItem = (id: string, field: keyof ExpenseItemEntry, value: any) => {
+    setExpenseItems(expenseItems.map(item => {
+      if (item.id === id) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    }));
   };
 
   const handleAddVendor = async () => {
@@ -313,60 +378,129 @@ export default function ExpensesPage() {
   const handleAddTransaction = async () => {
     if (!selectedSupplier) return;
 
+    // Validate that all items have names
+    const emptyItems = expenseItems.filter(item => !item.itemName.trim());
+    if (emptyItems.length > 0) {
+      setMessage({ type: 'error', text: 'Please enter item names for all rows' });
+      return;
+    }
+
+    // Validate that all items have quantity > 0
+    const invalidQty = expenseItems.filter(item => item.quantity <= 0);
+    if (invalidQty.length > 0) {
+      setMessage({ type: 'error', text: 'Quantity must be greater than 0 for all items' });
+      return;
+    }
+
+    // Validate that all items have amount > 0
+    const invalidAmount = expenseItems.filter(item => item.amount <= 0);
+    if (invalidAmount.length > 0) {
+      setMessage({ type: 'error', text: 'Amount must be greater than 0 for all items' });
+      return;
+    }
+
     try {
-      const totalAmount = newTransaction.quantity * newTransaction.unitPrice;
-      const balance = totalAmount - newTransaction.amountPaid;
-      
-      let status: TransactionStatus = 'pending';
-      if (newTransaction.paymentMethod === 'cheque') {
-        status = 'pending';
-      } else if (newTransaction.amountPaid === 0) {
-        status = 'pending';
-      } else if (newTransaction.amountPaid >= totalAmount) {
-        status = 'completed';
-      } else {
-        status = 'partial';
+      // Save each item as a separate transaction
+      for (const item of expenseItems) {
+        const totalAmount = item.quantity * item.amount;
+        
+        const result = await saveExpenseTransaction({
+          supplierId: selectedSupplier.id,
+          supplierName: selectedSupplier.name,
+          transactionDate: new Date().toISOString().split('T')[0],
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unit: 'unit',
+          unitPrice: item.amount,
+          totalAmount: totalAmount,
+          amountPaid: 0, // Start with 0 paid
+          balance: totalAmount, // Full amount is balance
+          paymentMethod: paymentDetails.paymentMethod || 'cheque',
+          chequeNumber: paymentDetails.chequeNumber || null,
+          chequeIssueDate: paymentDetails.chequeIssueDate || null,
+          chequeClearingDate: paymentDetails.chequeClearingDate || null,
+          chequeBank: paymentDetails.chequeBank || null,
+          purchasedBy: paymentDetails.purchasedBy || null,
+          salesDate: paymentDetails.salesDate || null,
+          notes: item.notes || paymentDetails.notes || null,
+          status: 'pending'
+        });
+
+        if (!result.success) {
+          setMessage({ type: 'error', text: `Failed to save item: ${item.itemName}` });
+          return;
+        }
       }
 
-      const result = await saveExpenseTransaction({
-        supplierId: selectedSupplier.id,
-        supplierName: selectedSupplier.name,
-        transactionDate: new Date().toISOString().split('T')[0],
-        ...newTransaction,
-        totalAmount: totalAmount,
-        balance: balance,
-        status: status
+      setMessage({ type: 'success', text: `All ${expenseItems.length} expense items saved successfully` });
+      setShowAddTransaction(false);
+      
+      // Reset expense items
+      setExpenseItems([{ id: '1', itemName: '', quantity: 1, amount: 0 }]);
+      setPaymentDetails({
+        paymentMethod: 'cheque',
+        chequeNumber: '',
+        chequeIssueDate: '',
+        chequeClearingDate: '',
+        chequeBank: '',
+        purchasedBy: '',
+        salesDate: '',
+        notes: ''
       });
-
-      if (result.success) {
-        setMessage({ type: 'success', text: 'Expense added successfully' });
-        setShowAddTransaction(false);
-        setNewTransaction({
-          itemName: '',
-          quantity: 1,
-          unit: '',
-          unitPrice: 0,
-          totalAmount: 0,
-          amountPaid: 0,
-          balance: 0,
-          paymentMethod: 'cheque',
-          chequeNumber: '',
-          chequeIssueDate: '',
-          chequeClearingDate: '',
-          chequeBank: '',
-          purchasedBy: '',
-          salesDate: '',
-          notes: ''
-        });
-        await loadData();
-        if (selectedSupplier) {
-          await loadSupplierDetails(selectedSupplier.id);
-        }
-      } else {
-        setMessage({ type: 'error', text: result.message || 'Failed to add expense' });
+      
+      await loadData();
+      if (selectedSupplier) {
+        await loadSupplierDetails(selectedSupplier.id);
       }
     } catch (error) {
-      console.error('Error adding expense:', error);
+      console.error('Error adding expenses:', error);
+      setMessage({ type: 'error', text: 'An error occurred' });
+    }
+  };
+
+  // Handle refund for a staff member
+  const handleRefund = async () => {
+    if (!selectedStaffForRefund) return;
+    
+    if (refundAmount <= 0) {
+      setMessage({ type: 'error', text: 'Please enter a valid refund amount' });
+      return;
+    }
+
+    // Get the total balance for this staff member
+    const staffTotal = staffSummary.find(s => s.staffName === selectedStaffForRefund);
+    if (!staffTotal) {
+      setMessage({ type: 'error', text: 'Staff member not found' });
+      return;
+    }
+
+    if (refundAmount > staffTotal.balance) {
+      setMessage({ type: 'error', text: `Refund amount cannot exceed balance of ${formatCurrency(staffTotal.balance)}` });
+      return;
+    }
+
+    try {
+      const result = await updateStaffRefund(
+        selectedStaffForRefund,
+        refundAmount,
+        refundNote || `Refund to ${selectedStaffForRefund}`
+      );
+
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
+        setShowRefundModal(false);
+        setSelectedStaffForRefund(null);
+        setRefundAmount(0);
+        setRefundNote('');
+        await loadData();
+        if (selectedStaff) {
+          await loadStaffTransactions(selectedStaff);
+        }
+      } else {
+        setMessage({ type: 'error', text: result.message || 'Failed to process refund' });
+      }
+    } catch (error) {
+      console.error('Error processing refund:', error);
       setMessage({ type: 'error', text: 'An error occurred' });
     }
   };
@@ -385,12 +519,24 @@ export default function ExpensesPage() {
     return true;
   });
 
+  // Calculate totals
   const totalBalance = supplierSummary.reduce((sum, s) => sum + s.balance, 0);
   const totalPurchases = supplierSummary.reduce((sum, s) => sum + s.totalPurchases, 0);
   const totalPaid = supplierSummary.reduce((sum, s) => sum + s.totalPaid, 0);
 
-  // Staff summary total
+  // Staff summary totals
   const staffTotalBalance = staffSummary.reduce((sum, s) => sum + s.balance, 0);
+  const staffTotalPurchases = staffSummary.reduce((sum, s) => sum + s.totalPurchases, 0);
+  const staffTotalPaid = staffSummary.reduce((sum, s) => sum + s.totalPaid, 0);
+
+  // Get staff totals for Simon and Fred
+  const getStaffTotals = (name: string) => {
+    const staff = staffSummary.find(s => s.staffName === name);
+    return staff || { totalPurchases: 0, totalPaid: 0, balance: 0, transactionCount: 0 };
+  };
+
+  const simonTotals = getStaffTotals('Simon');
+  const fredTotals = getStaffTotals('Fred');
 
   // Render main dashboard
   const renderDashboard = () => (
@@ -430,7 +576,124 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      {/* Staff Summary */}
+      {/* Staff Tabs - Simon & Fred */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Simon Card */}
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <UserCircle className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Simon</h3>
+              <p className="text-xs text-gray-500">Click to view details</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-xs text-gray-500">Spent</p>
+              <p className="text-sm font-semibold text-blue-600">{formatCurrency(simonTotals.totalPurchases)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Refunded</p>
+              <p className="text-sm font-semibold text-green-600">{formatCurrency(simonTotals.totalPaid)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Balance</p>
+              <p className={`text-sm font-bold ${simonTotals.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {formatCurrency(simonTotals.balance)}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => loadStaffTransactions('Simon')}
+              className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              View Details
+            </button>
+            {simonTotals.balance > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedStaffForRefund('Simon');
+                  setRefundAmount(0);
+                  setRefundNote('');
+                  setShowRefundModal(true);
+                }}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                <Wallet className="h-4 w-4 inline mr-1" />
+                Refund
+              </button>
+            )}
+          </div>
+          {simonTotals.balance > 0 && (
+            <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              <span>Company owes {formatCurrency(simonTotals.balance)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Fred Card */}
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <UserCircle className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Fred</h3>
+              <p className="text-xs text-gray-500">Click to view details</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-xs text-gray-500">Spent</p>
+              <p className="text-sm font-semibold text-blue-600">{formatCurrency(fredTotals.totalPurchases)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Refunded</p>
+              <p className="text-sm font-semibold text-green-600">{formatCurrency(fredTotals.totalPaid)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Balance</p>
+              <p className={`text-sm font-bold ${fredTotals.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {formatCurrency(fredTotals.balance)}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => loadStaffTransactions('Fred')}
+              className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              View Details
+            </button>
+            {fredTotals.balance > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedStaffForRefund('Fred');
+                  setRefundAmount(0);
+                  setRefundNote('');
+                  setShowRefundModal(true);
+                }}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                <Wallet className="h-4 w-4 inline mr-1" />
+                Refund
+              </button>
+            )}
+          </div>
+          {fredTotals.balance > 0 && (
+            <div className="mt-2 text-xs text-red-500 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              <span>Company owes {formatCurrency(fredTotals.balance)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Staff Summary Table */}
       <div className="bg-white border rounded-lg p-4">
         <h3 className="font-semibold mb-3 flex items-center gap-2">
           <Users className="h-4 w-4" />
@@ -441,15 +704,19 @@ export default function ExpensesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 py-2 text-left">Staff</th>
-                <th className="px-3 py-2 text-right">Total Purchases</th>
-                <th className="px-3 py-2 text-right">Paid</th>
-                <th className="px-3 py-2 text-right">Balance</th>
+                <th className="px-3 py-2 text-right">Total Spent</th>
+                <th className="px-3 py-2 text-right">Refunded</th>
+                <th className="px-3 py-2 text-right">Balance (Owed)</th>
                 <th className="px-3 py-2 text-center">Transactions</th>
+                <th className="px-3 py-2 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {staffSummary.map((staff) => (
-                <tr key={staff.staffName}>
+                <tr 
+                  key={staff.staffName}
+                  className="hover:bg-gray-50"
+                >
                   <td className="px-3 py-2 font-medium">{staff.staffName}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(staff.totalPurchases)}</td>
                   <td className="px-3 py-2 text-right text-green-600">{formatCurrency(staff.totalPaid)}</td>
@@ -457,11 +724,32 @@ export default function ExpensesPage() {
                     {formatCurrency(staff.balance)}
                   </td>
                   <td className="px-3 py-2 text-center">{staff.transactionCount}</td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => loadStaffTransactions(staff.staffName)}
+                      className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 mr-1"
+                    >
+                      View
+                    </button>
+                    {staff.balance > 0 && (
+                      <button
+                        onClick={() => {
+                          setSelectedStaffForRefund(staff.staffName);
+                          setRefundAmount(0);
+                          setRefundNote('');
+                          setShowRefundModal(true);
+                        }}
+                        className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                      >
+                        Refund
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {staffSummary.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 py-4 text-center text-gray-500">
                     No staff expense records found
                   </td>
                 </tr>
@@ -523,6 +811,141 @@ export default function ExpensesPage() {
     </div>
   );
 
+  // Render staff detail view
+  const renderStaffDetail = () => {
+    if (!selectedStaff) return null;
+
+    const staffTrans = staffTransactions;
+    const totalBalance = staffTrans.reduce((sum, t) => sum + t.balance, 0);
+    const totalAmount = staffTrans.reduce((sum, t) => sum + t.totalAmount, 0);
+    const totalPaid = staffTrans.reduce((sum, t) => sum + t.amountPaid, 0);
+
+    return (
+      <div className="space-y-4">
+        {/* Back button */}
+        <button
+          onClick={() => {
+            setSelectedStaff(null);
+            setStaffTransactions([]);
+            loadData();
+          }}
+          className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        >
+          ← Back to Expenses
+        </button>
+
+        {/* Staff Header */}
+        <div className="bg-white border rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold">{selectedStaff}</h2>
+              <p className="text-sm text-gray-500">Staff Expenses</p>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-gray-500">Total Spent</span>
+                <p className="font-bold text-blue-600">{formatCurrency(totalAmount)}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Refunded</span>
+                <p className="font-bold text-green-600">{formatCurrency(totalPaid)}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Balance Owed</span>
+                <p className={`font-bold ${totalBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatCurrency(totalBalance)}
+                </p>
+              </div>
+            </div>
+          </div>
+          {totalBalance > 0 && (
+            <div className="mt-3">
+              <button
+                onClick={() => {
+                  setSelectedStaffForRefund(selectedStaff);
+                  setRefundAmount(0);
+                  setRefundNote('');
+                  setShowRefundModal(true);
+                }}
+                className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                <Wallet className="h-4 w-4 inline mr-1" />
+                Process Refund for {selectedStaff}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Transactions Table */}
+        <div className="bg-white border rounded-lg p-4">
+          <h3 className="font-semibold mb-3">Transactions</h3>
+
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Item</th>
+                  <th className="px-3 py-2 text-center">Qty</th>
+                  <th className="px-3 py-2 text-right">Total</th>
+                  <th className="px-3 py-2 text-right">Refunded</th>
+                  <th className="px-3 py-2 text-right">Balance</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {staffTrans.map((t) => {
+                  const status = (t.status || 'pending') as TransactionStatus;
+                  const statusColors: Record<TransactionStatus, string> = {
+                    pending: 'bg-yellow-100 text-yellow-700',
+                    partial: 'bg-blue-100 text-blue-700',
+                    completed: 'bg-green-100 text-green-700',
+                    overdue: 'bg-red-100 text-red-700',
+                    cleared: 'bg-purple-100 text-purple-700'
+                  };
+                  
+                  return (
+                    <tr key={t.id}>
+                      <td className="px-3 py-2 text-sm">{formatDate(t.transactionDate)}</td>
+                      <td className="px-3 py-2 text-sm">{t.itemName}</td>
+                      <td className="px-3 py-2 text-center">{t.quantity} {t.unit}</td>
+                      <td className="px-3 py-2 text-right font-medium">{formatCurrency(t.totalAmount)}</td>
+                      <td className="px-3 py-2 text-right text-green-600">{formatCurrency(t.amountPaid)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{formatCurrency(t.balance)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>
+                          {status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {staffTrans.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-center text-gray-500">
+                      No transactions found for {selectedStaff}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-2">
+            {staffTrans.map((t) => (
+              <TransactionCard key={t.id} transaction={t} />
+            ))}
+            {staffTrans.length === 0 && (
+              <p className="text-center text-gray-500 py-4">No transactions found</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render supplier detail view
   const renderSupplierDetail = () => {
     if (!selectedSupplier) return null;
@@ -559,7 +982,20 @@ export default function ExpensesPage() {
                 Add Item
               </button>
               <button
-                onClick={() => setShowAddTransaction(true)}
+                onClick={() => {
+                  setExpenseItems([{ id: '1', itemName: '', quantity: 1, amount: 0 }]);
+                  setPaymentDetails({
+                    paymentMethod: 'cheque',
+                    chequeNumber: '',
+                    chequeIssueDate: '',
+                    chequeClearingDate: '',
+                    chequeBank: '',
+                    purchasedBy: '',
+                    salesDate: '',
+                    notes: ''
+                  });
+                  setShowAddTransaction(true);
+                }}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 <Plus className="h-4 w-4 inline mr-1" />
@@ -893,218 +1329,285 @@ export default function ExpensesPage() {
     </div>
   );
 
-  // Add Expense Modal (from previous code - keeping it the same)
+  // Add Expense Modal
   const renderAddExpenseModal = () => {
     if (!selectedSupplier) return null;
 
-    const items = selectedSupplier.items || [];
-    const selectedItem = items.find((i: ExpenseItem) => i.itemName === newTransaction.itemName);
-
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">New Expense - {selectedSupplier.name}</h3>
+            <h3 className="text-lg font-bold">New Expenses - {selectedSupplier.name}</h3>
             <button onClick={() => setShowAddTransaction(false)}>
               <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Expense Items Section */}
             <div>
-              <label className="block text-sm font-medium mb-1">Item</label>
-              <select
-                value={newTransaction.itemName}
-                onChange={(e) => {
-                  const selected = items.find((i: ExpenseItem) => i.itemName === e.target.value);
-                  setNewTransaction({
-                    ...newTransaction,
-                    itemName: e.target.value,
-                    unit: selected?.unit || '',
-                    unitPrice: selected?.unitPrice || 0
-                  });
-                }}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-              >
-                <option value="">Select Item</option>
-                {items.map((i: ExpenseItem) => (
-                  <option key={i.itemName} value={i.itemName}>
-                    {i.itemName} ({formatCurrency(i.unitPrice)}/{i.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Quantity</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newTransaction.quantity}
-                  onChange={(e) => {
-                    const qty = parseFloat(e.target.value) || 0;
-                    setNewTransaction({
-                      ...newTransaction,
-                      quantity: qty,
-                      totalAmount: qty * newTransaction.unitPrice,
-                      balance: (qty * newTransaction.unitPrice) - newTransaction.amountPaid
-                    });
-                  }}
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Unit</label>
-                <input
-                  type="text"
-                  value={newTransaction.unit}
-                  readOnly
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Unit Price (GH₵)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newTransaction.unitPrice}
-                  onChange={(e) => {
-                    const price = parseFloat(e.target.value) || 0;
-                    setNewTransaction({
-                      ...newTransaction,
-                      unitPrice: price,
-                      totalAmount: newTransaction.quantity * price,
-                      balance: (newTransaction.quantity * price) - newTransaction.amountPaid
-                    });
-                  }}
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Total (GH₵)</label>
-                <input
-                  type="text"
-                  value={formatCurrency(newTransaction.totalAmount)}
-                  readOnly
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 font-semibold"
-                />
-              </div>
-            </div>
-
-            {/* Payment Method and Cheque Details */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Method</label>
-              <select
-                value={newTransaction.paymentMethod}
-                onChange={(e) => setNewTransaction({ ...newTransaction, paymentMethod: e.target.value as any })}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-              >
-                <option value="cheque">Cheque</option>
-                <option value="cash">Cash</option>
-                <option value="credit">Credit</option>
-              </select>
-            </div>
-
-            {newTransaction.paymentMethod === 'cheque' && (
-              <div className="border-l-4 border-purple-500 pl-4 space-y-4">
-                <h4 className="font-medium text-sm text-purple-700">Cheque Details</h4>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Cheque Number *</label>
-                    <input
-                      type="text"
-                      value={newTransaction.chequeNumber}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, chequeNumber: e.target.value })}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                      placeholder="e.g., CHQ-001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Bank</label>
-                    <input
-                      type="text"
-                      value={newTransaction.chequeBank}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, chequeBank: e.target.value })}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                      placeholder="e.g., Stanbic Bank"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Issue Date *</label>
-                    <input
-                      type="date"
-                      value={newTransaction.chequeIssueDate}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, chequeIssueDate: e.target.value })}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Clearing Date</label>
-                    <input
-                      type="date"
-                      value={newTransaction.chequeClearingDate}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, chequeClearingDate: e.target.value })}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Purchased By</label>
-                <select
-                  value={newTransaction.purchasedBy}
-                  onChange={(e) => setNewTransaction({ ...newTransaction, purchasedBy: e.target.value })}
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-sm text-gray-700">Expense Items</h4>
+                <button
+                  onClick={addExpenseItemRow}
+                  className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
                 >
-                  <option value="">Select Staff</option>
-                  <option value="Simon">Simon</option>
-                  <option value="Fred">Fred</option>
-                  <option value="Other">Other</option>
-                </select>
+                  <Plus className="h-4 w-4" />
+                  Add Item
+                </button>
               </div>
-              <div>
+
+              <div className="space-y-3">
+                {expenseItems.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={item.itemName}
+                        onChange={(e) => updateExpenseItem(item.id, 'itemName', e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder={`Item ${index + 1} name`}
+                      />
+                    </div>
+                    <div className="w-24">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={item.quantity}
+                        onChange={(e) => updateExpenseItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="w-full border rounded-md px-2 py-2 text-sm text-center focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="Qty"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={item.amount}
+                        onChange={(e) => updateExpenseItem(item.id, 'amount', parseFloat(e.target.value) || 0)}
+                        className="w-full border rounded-md px-2 py-2 text-sm text-right focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="Amount"
+                      />
+                    </div>
+                    <div className="w-28 text-sm font-medium text-blue-600 text-right">
+                      {formatCurrency(item.quantity * item.amount)}
+                    </div>
+                    <button
+                      onClick={() => removeExpenseItemRow(item.id)}
+                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grand Total */}
+              <div className="flex justify-end mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Grand Total</p>
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(grandTotal)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Details */}
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-sm text-gray-700 mb-3">Payment Details</h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Payment Method</label>
+                  <select
+                    value={paymentDetails.paymentMethod}
+                    onChange={(e) => setPaymentDetails({ ...paymentDetails, paymentMethod: e.target.value as any })}
+                    className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="cheque">Cheque</option>
+                    <option value="cash">Cash</option>
+                    <option value="credit">Credit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Purchased By</label>
+                  <select
+                    value={paymentDetails.purchasedBy}
+                    onChange={(e) => setPaymentDetails({ ...paymentDetails, purchasedBy: e.target.value })}
+                    className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Select Staff</option>
+                    <option value="Simon">Simon</option>
+                    <option value="Fred">Fred</option>
+                    <option value="Other">Sales</option>
+                  </select>
+                </div>
+              </div>
+
+              {paymentDetails.paymentMethod === 'cheque' && (
+                <div className="border-l-4 border-purple-500 pl-4 mt-4 space-y-4">
+                  <h4 className="font-medium text-sm text-purple-700">Cheque Details</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Cheque Number</label>
+                      <input
+                        type="text"
+                        value={paymentDetails.chequeNumber}
+                        onChange={(e) => setPaymentDetails({ ...paymentDetails, chequeNumber: e.target.value })}
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="e.g., CHQ-001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Bank</label>
+                      <input
+                        type="text"
+                        value={paymentDetails.chequeBank}
+                        onChange={(e) => setPaymentDetails({ ...paymentDetails, chequeBank: e.target.value })}
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="e.g., Stanbic Bank"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Issue Date</label>
+                      <input
+                        type="date"
+                        value={paymentDetails.chequeIssueDate}
+                        onChange={(e) => setPaymentDetails({ ...paymentDetails, chequeIssueDate: e.target.value })}
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Clearing Date</label>
+                      <input
+                        type="date"
+                        value={paymentDetails.chequeClearingDate}
+                        onChange={(e) => setPaymentDetails({ ...paymentDetails, chequeClearingDate: e.target.value })}
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4">
                 <label className="block text-sm font-medium mb-1">Sales Date</label>
                 <input
                   type="date"
-                  value={newTransaction.salesDate}
-                  onChange={(e) => setNewTransaction({ ...newTransaction, salesDate: e.target.value })}
+                  value={paymentDetails.salesDate}
+                  onChange={(e) => setPaymentDetails({ ...paymentDetails, salesDate: e.target.value })}
                   className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">Date of sales this expense is for</p>
               </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={paymentDetails.notes}
+                  onChange={(e) => setPaymentDetails({ ...paymentDetails, notes: e.target.value })}
+                  rows={2}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  placeholder="Any additional notes"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <button
+                onClick={handleAddTransaction}
+                disabled={expenseItems.some(item => !item.itemName.trim()) || grandTotal === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                Save All Expenses ({expenseItems.length} items)
+              </button>
+              <button
+                onClick={() => setShowAddTransaction(false)}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Refund Modal
+  const renderRefundModal = () => {
+    if (!selectedStaffForRefund) return null;
+
+    const staffTotal = staffSummary.find(s => s.staffName === selectedStaffForRefund);
+    const maxRefund = staffTotal?.balance || 0;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold">Process Refund - {selectedStaffForRefund}</h3>
+            <button onClick={() => setShowRefundModal(false)}>
+              <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm">
+                <span className="text-gray-500">Staff Member:</span> {selectedStaffForRefund}
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-500">Total Spent:</span> {formatCurrency(staffTotal?.totalPurchases || 0)}
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-500">Already Refunded:</span> {formatCurrency(staffTotal?.totalPaid || 0)}
+              </p>
+              <p className="text-sm font-semibold">
+                <span className="text-gray-500">Balance Owed:</span> {formatCurrency(maxRefund)}
+              </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Notes</label>
-              <textarea
-                value={newTransaction.notes}
-                onChange={(e) => setNewTransaction({ ...newTransaction, notes: e.target.value })}
-                rows={2}
+              <label className="block text-sm font-medium mb-1">Refund Amount (GH₵)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={maxRefund}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
                 className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                placeholder="Any additional notes"
+                placeholder="Enter amount to refund"
+              />
+              <p className="text-xs text-gray-500 mt-1">Max: {formatCurrency(maxRefund)}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Note (Optional)</label>
+              <input
+                type="text"
+                value={refundNote}
+                onChange={(e) => setRefundNote(e.target.value)}
+                className="w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                placeholder="e.g., Cash refund to Simon"
               />
             </div>
 
             <div className="flex gap-2 pt-4">
               <button
-                onClick={handleAddTransaction}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                onClick={handleRefund}
+                disabled={refundAmount <= 0 || refundAmount > maxRefund}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
               >
-                Save Expense
+                Process Refund
               </button>
               <button
-                onClick={() => setShowAddTransaction(false)}
+                onClick={() => setShowRefundModal(false)}
                 className="px-4 py-2 border rounded-md hover:bg-gray-50"
               >
                 Cancel
@@ -1149,11 +1652,12 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {viewMode === 'list' ? renderDashboard() : renderSupplierDetail()}
+      {selectedStaff ? renderStaffDetail() : viewMode === 'list' ? renderDashboard() : renderSupplierDetail()}
 
       {showAddVendor && renderAddVendorModal()}
       {showAddItem && renderAddItemModal()}
       {showAddTransaction && renderAddExpenseModal()}
+      {showRefundModal && renderRefundModal()}
     </div>
   );
 }

@@ -25,16 +25,14 @@ export async function initializeSuppliers() {
       `;
 
       if (existing.length === 0) {
-        // Insert supplier with payment terms
+        // Insert supplier
         await sql`
           INSERT INTO suppliers (
-            id, name, code, category, contact_person, phone, email,
-            payment_terms, credit_days
+            id, name, code, category, contact_person, phone, email
           ) VALUES (
             ${supplier.id}, ${supplier.name}, ${supplier.code}, 
             ${supplier.category}, ${supplier.contactPerson || null}, 
-            ${supplier.phone || null}, ${supplier.email || null},
-            ${supplier.paymentTerms || 'credit'}, ${supplier.creditDays || 30}
+            ${supplier.phone || null}, ${supplier.email || null}
           )
         `;
 
@@ -94,8 +92,6 @@ export async function getSuppliers() {
       phone: s.phone,
       email: s.email,
       address: s.address,
-      paymentTerms: s.payment_terms || 'credit',
-      creditDays: s.credit_days || 30,
       products: productsBySupplier[s.id] || [],
       createdAt: s.created_at,
       updatedAt: s.updated_at
@@ -156,21 +152,6 @@ export async function saveTransaction(data: any) {
   try {
     await sql`BEGIN`;
 
-    // Calculate due date for credit
-    let dueDate = null;
-    if (data.paymentMethod === 'credit') {
-      // Get supplier to check credit days
-      const supplier = await sql`
-        SELECT credit_days FROM suppliers WHERE id = ${data.supplierId}
-      `;
-      if (supplier.length > 0) {
-        const days = supplier[0].credit_days || 30;
-        const date = new Date(data.transactionDate);
-        date.setDate(date.getDate() + days);
-        dueDate = date.toISOString().split('T')[0];
-      }
-    }
-
     // Determine status
     let status = data.status || 'pending';
     if (data.paymentMethod === 'cheque' && data.chequeNumber) {
@@ -188,7 +169,7 @@ export async function saveTransaction(data: any) {
         supplier_id, supplier_name, transaction_date, product_name,
         quantity, unit, unit_price, total_amount, amount_paid,
         balance, payment_method, cheque_number, cheque_issue_date,
-        cheque_clearing_date, cheque_bank, due_date, notes, status
+        cheque_clearing_date, cheque_bank, notes, status
       ) VALUES (
         ${data.supplierId}, ${data.supplierName}, ${data.transactionDate},
         ${data.productName}, ${data.quantity}, ${data.unit},
@@ -196,7 +177,7 @@ export async function saveTransaction(data: any) {
         ${data.balance || data.totalAmount}, ${data.paymentMethod || 'credit'},
         ${data.chequeNumber || null}, ${data.chequeIssueDate || null},
         ${data.chequeClearingDate || null}, ${data.chequeBank || null},
-        ${dueDate}, ${data.notes || null}, ${status}
+        ${data.notes || null}, ${status}
       )
       RETURNING *
     `;
@@ -221,14 +202,12 @@ export async function saveTransaction(data: any) {
       await sql`
         INSERT INTO supplier_payments (
           supplier_id, supplier_name, payment_date, amount,
-          payment_method, cheque_number, cheque_issue_date,
-          cheque_clearing_date, cheque_bank, notes
+          payment_method, cheque_number, cheque_date, cheque_bank, notes
         ) VALUES (
           ${data.supplierId}, ${data.supplierName}, ${data.transactionDate},
           ${data.amountPaid}, ${data.paymentMethod || 'cash'},
           ${data.chequeNumber || null}, ${data.chequeIssueDate || null},
-          ${data.chequeClearingDate || null}, ${data.chequeBank || null},
-          ${data.notes || null}
+          ${data.chequeBank || null}, ${data.notes || null}
         )
       `;
     }
@@ -292,7 +271,6 @@ export async function getSupplierTransactions(supplierId: string, startDate?: st
       chequeIssueDate: t.cheque_issue_date,
       chequeClearingDate: t.cheque_clearing_date,
       chequeBank: t.cheque_bank,
-      dueDate: t.due_date,
       notes: t.notes,
       status: t.status,
       createdAt: t.created_at,
@@ -341,7 +319,7 @@ export async function getSupplierSummary(supplierId: string) {
   }
 }
 
-// Record payment
+// Record payment - FIXED: removed cheque_issue_date and used cheque_date instead
 export async function recordPayment(data: {
   supplierId: string;
   supplierName: string;
@@ -360,14 +338,12 @@ export async function recordPayment(data: {
     const payment = await sql`
       INSERT INTO supplier_payments (
         supplier_id, supplier_name, payment_date, amount,
-        payment_method, cheque_number, cheque_issue_date,
-        cheque_clearing_date, cheque_bank, notes
+        payment_method, cheque_number, cheque_date, cheque_bank, notes
       ) VALUES (
         ${data.supplierId}, ${data.supplierName}, ${data.paymentDate},
         ${data.amount}, ${data.paymentMethod},
         ${data.chequeNumber || null}, ${data.chequeIssueDate || null},
-        ${data.chequeClearingDate || null}, ${data.chequeBank || null},
-        ${data.notes || null}
+        ${data.chequeBank || null}, ${data.notes || null}
       )
       RETURNING *
     `;
@@ -436,7 +412,6 @@ export async function getAllSupplierSummaries() {
       SELECT 
         s.id as supplier_id,
         s.name as supplier_name,
-        s.payment_terms,
         COALESCE(SUM(st.total_amount), 0) as total_purchases,
         COALESCE(SUM(st.amount_paid), 0) as total_paid,
         COALESCE(SUM(st.balance), 0) as balance,
@@ -445,14 +420,13 @@ export async function getAllSupplierSummaries() {
         COUNT(CASE WHEN st.status = 'overdue' THEN 1 END) as overdue_count
       FROM suppliers s
       LEFT JOIN supplier_transactions st ON s.id = st.supplier_id
-      GROUP BY s.id, s.name, s.payment_terms
+      GROUP BY s.id, s.name
       ORDER BY s.name
     `;
 
     const result = summaries.map((s: any) => ({
       supplierId: s.supplier_id,
       supplierName: s.supplier_name,
-      paymentTerms: s.payment_terms || 'credit',
       totalPurchases: Number(s.total_purchases),
       totalPaid: Number(s.total_paid),
       balance: Number(s.balance),
@@ -606,9 +580,8 @@ export async function getOverdueCredits() {
     const overdue = await sql`
       SELECT * FROM supplier_transactions 
       WHERE payment_method = 'credit'
-      AND due_date < ${today}
       AND status IN ('pending', 'partial')
-      ORDER BY due_date ASC
+      ORDER BY transaction_date ASC
     `;
 
     const result = overdue.map((t: any) => ({
@@ -620,9 +593,9 @@ export async function getOverdueCredits() {
       totalAmount: Number(t.total_amount),
       amountPaid: Number(t.amount_paid),
       balance: Number(t.balance),
-      dueDate: t.due_date,
+      dueDate: t.due_date || null,
       status: t.status,
-      daysOverdue: Math.floor((new Date().getTime() - new Date(t.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      daysOverdue: t.due_date ? Math.floor((new Date().getTime() - new Date(t.due_date).getTime()) / (1000 * 60 * 60 * 24)) : 0
     }));
 
     return { success: true, data: result };

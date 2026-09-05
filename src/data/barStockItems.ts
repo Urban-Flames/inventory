@@ -80,5 +80,7 @@ export const initialBarStockData: BarDailyItem[] = [
   { id: 'b53', name: 'Crushed Ice Pack', category: 'ice_mixers', unit: 'pks', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b54', name: 'Apple Juice', category: 'ice_mixers', unit: 'pks', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
   { id: 'b55', name: 'Cranberry Juice', category: 'ice_mixers', unit: 'pks', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+    { id: 'b70', name: 'Grape Juice', category: 'ice_mixers', unit: 'pks', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
+
   { id: 'b56', name: 'Frosty Bite Ice Cream', category: 'ice_mixers', unit: 'bucket', downOpen: 0, downAdd: 0, downClose: 0, fridgeOpen: 0, fridgeAdd: 0, fridgeClose: 0, waste: 0, totalStock: 0, totalSales: 0 },
 ];

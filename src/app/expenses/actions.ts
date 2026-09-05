@@ -5,6 +5,11 @@ import { sql } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { expenseSuppliers, commonExpenseItems } from '@/data/expenseSuppliers';
 
+// Helper function for formatting currency (for messages)
+const formatCurrency = (amount: number) => {
+  return `GH₵ ${amount.toFixed(2)}`;
+};
+
 // Initialize expense suppliers
 export async function initializeExpenseSuppliers() {
   try {
@@ -373,6 +378,230 @@ export async function getExpenseSupplierSummary() {
   } catch (error) {
     console.error('Error fetching expense supplier summary:', error);
     return { success: false, data: null, message: 'Failed to fetch expense supplier summary' };
+  }
+}
+
+// Get staff transactions
+export async function getStaffTransactions(staffName: string) {
+  try {
+    const transactions = await sql`
+      SELECT * FROM expense_transactions 
+      WHERE purchased_by = ${staffName}
+      ORDER BY transaction_date DESC, created_at DESC
+    `;
+
+    const result = transactions.map((t: any) => ({
+      id: t.id,
+      supplierId: t.supplier_id,
+      supplierName: t.supplier_name,
+      transactionDate: t.transaction_date,
+      itemName: t.item_name,
+      quantity: Number(t.quantity),
+      unit: t.unit,
+      unitPrice: Number(t.unit_price),
+      totalAmount: Number(t.total_amount),
+      amountPaid: Number(t.amount_paid),
+      balance: Number(t.balance),
+      paymentMethod: t.payment_method,
+      chequeNumber: t.cheque_number,
+      chequeIssueDate: t.cheque_issue_date,
+      chequeClearingDate: t.cheque_clearing_date,
+      chequeBank: t.cheque_bank,
+      purchasedBy: t.purchased_by,
+      salesDate: t.sales_date,
+      notes: t.notes,
+      status: t.status,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error fetching staff transactions:', error);
+    return { success: false, data: null, message: 'Failed to fetch staff transactions' };
+  }
+}
+
+// Update staff refund - FIXED: creates staff supplier within the same transaction
+export async function updateStaffRefund(
+  staffName: string,
+  refundAmount: number,
+  note?: string
+) {
+  try {
+    await sql`BEGIN`;
+
+    // Create supplier ID for staff
+    const supplierId = `staff_${staffName.toLowerCase()}`;
+    
+    // Check if supplier exists, create if not
+    const existing = await sql`
+      SELECT id FROM expense_suppliers WHERE id = ${supplierId}
+    `;
+    
+    if (existing.length === 0) {
+      // Create staff as supplier
+      await sql`
+        INSERT INTO expense_suppliers (
+          id, name, code, category, payment_terms, credit_days, is_custom
+        ) VALUES (
+          ${supplierId}, 
+          ${staffName}, 
+          ${'STAFF-' + staffName.toUpperCase().slice(0, 3) + '-' + Date.now().toString().slice(-4)}, 
+          'Staff', 
+          'cash', 
+          0, 
+          true
+        )
+      `;
+    }
+
+    // Get all pending transactions for this staff member with balance > 0
+    const transactions = await sql`
+      SELECT * FROM expense_transactions 
+      WHERE purchased_by = ${staffName} AND balance > 0
+      ORDER BY created_at ASC
+    `;
+
+    if (transactions.length === 0) {
+      await sql`ROLLBACK`;
+      return { success: false, message: `No pending transactions found for ${staffName}` };
+    }
+
+    let remainingRefund = refundAmount;
+    let totalRefunded = 0;
+
+    // Distribute the refund across transactions (oldest first)
+    for (const transaction of transactions) {
+      if (remainingRefund <= 0) break;
+
+      const currentBalance = Number(transaction.balance);
+      const currentPaid = Number(transaction.amount_paid);
+      const amountToRefund = Math.min(remainingRefund, currentBalance);
+
+      const newPaid = currentPaid + amountToRefund;
+      const newBalance = currentBalance - amountToRefund;
+      const newStatus = newBalance === 0 ? 'completed' : 'partial';
+
+      await sql`
+        UPDATE expense_transactions 
+        SET 
+          amount_paid = ${newPaid},
+          balance = ${newBalance},
+          status = ${newStatus},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${transaction.id}
+      `;
+
+      remainingRefund -= amountToRefund;
+      totalRefunded += amountToRefund;
+    }
+
+    // Record the refund payment using the staff supplier_id
+    await sql`
+      INSERT INTO expense_payments (
+        supplier_id, supplier_name, payment_date, amount,
+        payment_method, notes
+      ) VALUES (
+        ${supplierId}, ${staffName}, 
+        CURRENT_DATE, ${totalRefunded},
+        'cash', ${note || `Refund to ${staffName}`}
+      )
+    `;
+
+    await sql`COMMIT`;
+    revalidatePath('/expenses');
+    revalidatePath('/expenses/staff');
+    
+    const remainingBalance = refundAmount - totalRefunded;
+    let message = `Refund of ${formatCurrency(totalRefunded)} processed for ${staffName}`;
+    if (remainingBalance > 0) {
+      message += `. Note: ${formatCurrency(remainingBalance)} could not be refunded as it exceeded available balances.`;
+    }
+
+    return { 
+      success: true, 
+      message: message
+    };
+  } catch (error) {
+    await sql`ROLLBACK`;
+    console.error('Error processing staff refund:', error);
+    return { success: false, message: 'Failed to process refund. Please try again.' };
+  }
+}
+
+// Update expense transaction payment
+export async function updateExpenseTransactionPayment(
+  transactionId: number,
+  paymentAmount: number,
+  note?: string
+) {
+  try {
+    await sql`BEGIN`;
+
+    // Get current transaction
+    const current = await sql`
+      SELECT * FROM expense_transactions WHERE id = ${transactionId}
+    `;
+
+    if (current.length === 0) {
+      await sql`ROLLBACK`;
+      return { success: false, message: 'Transaction not found' };
+    }
+
+    const transaction = current[0];
+    const currentBalance = Number(transaction.balance);
+    const currentPaid = Number(transaction.amount_paid);
+
+    if (paymentAmount <= 0) {
+      await sql`ROLLBACK`;
+      return { success: false, message: 'Payment amount must be greater than 0' };
+    }
+
+    if (paymentAmount > currentBalance) {
+      await sql`ROLLBACK`;
+      return { success: false, message: `Payment amount (${formatCurrency(paymentAmount)}) exceeds balance (${formatCurrency(currentBalance)})` };
+    }
+
+    const newPaid = currentPaid + paymentAmount;
+    const newBalance = currentBalance - paymentAmount;
+    const newStatus = newBalance === 0 ? 'completed' : 'partial';
+
+    // Update transaction
+    await sql`
+      UPDATE expense_transactions 
+      SET 
+        amount_paid = ${newPaid},
+        balance = ${newBalance},
+        status = ${newStatus},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${transactionId}
+    `;
+
+    // Record the payment in expense_payments table
+    await sql`
+      INSERT INTO expense_payments (
+        supplier_id, supplier_name, payment_date, amount,
+        payment_method, notes
+      ) VALUES (
+        ${transaction.supplier_id}, ${transaction.supplier_name}, 
+        CURRENT_DATE, ${paymentAmount},
+        'cash', ${note || `Payment recorded for ${transaction.item_name} (Transaction #${transactionId})`}
+      )
+    `;
+
+    await sql`COMMIT`;
+    revalidatePath('/expenses');
+    revalidatePath('/expenses/staff');
+    
+    return { 
+      success: true, 
+      message: `Payment of ${formatCurrency(paymentAmount)} recorded successfully. Remaining balance: ${formatCurrency(newBalance)}`
+    };
+  } catch (error) {
+    await sql`ROLLBACK`;
+    console.error('Error updating payment:', error);
+    return { success: false, message: 'Failed to update payment. Please try again.' };
   }
 }
 

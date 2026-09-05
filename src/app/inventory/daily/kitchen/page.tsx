@@ -480,7 +480,7 @@ export default function KitchenDailyInventoryPage() {
       {/* Header with Date Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Kitchen Daily Inventory</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Kitchen</h1>
           
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-500" />
@@ -578,7 +578,7 @@ export default function KitchenDailyInventoryPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm text-gray-500">Total Sales</p>
-              <p className="text-xl sm:text-2xl font-bold text-green-600">{totalSales}</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{totalSales.toFixed(2)}</p>
             </div>
             <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
               <span className="text-green-600 font-bold">$</span>
@@ -589,7 +589,7 @@ export default function KitchenDailyInventoryPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm text-gray-500">Total Waste</p>
-              <p className="text-xl sm:text-2xl font-bold text-red-600">{totalWaste}</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600">{totalWaste.toFixed(2)}</p>
             </div>
             <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
               <span className="text-red-600 font-bold">W</span>
@@ -661,7 +661,7 @@ export default function KitchenDailyInventoryPage() {
                   }}
                 >
                   <span className="font-medium">{kitchenItemName}</span>
-                  <span className="ml-2 text-amber-600 font-bold">{totalAvailable}</span>
+                  <span className="ml-2 text-amber-600 font-bold">{totalAvailable.toFixed(2)}</span>
                   <span className="text-xs text-gray-500 ml-1">available</span>
                   <Plus className="h-3 w-3 inline ml-1 text-amber-600" />
                   {batches.length > 1 && (
@@ -747,7 +747,7 @@ export default function KitchenDailyInventoryPage() {
                           <span className="font-medium">{item.name}</span>
                           {hasProduction && isToday && (
                             <span className="ml-2 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">
-                              📦 {productionAvailable} available
+                              📦 {productionAvailable.toFixed(2)} available
                             </span>
                           )}
                           {productionProducts.length > 0 && isToday && (
@@ -757,12 +757,12 @@ export default function KitchenDailyInventoryPage() {
                           )}
                           {hasVariance && (
                             <span className="ml-2 text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-medium">
-                              Var: {item.variance}
+                              Var: {item.variance?.toFixed(2)}
                             </span>
                           )}
                           {isToday && tomorrowOpen > 0 && (
                             <span className="ml-2 text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-medium">
-                              Tomorrow: {tomorrowOpen}
+                              Tomorrow: {tomorrowOpen.toFixed(2)}
                             </span>
                           )}
                           {isAtProductionLimit && isToday && (
@@ -812,12 +812,12 @@ export default function KitchenDailyInventoryPage() {
                         />
                         {hasProduction && isToday && (
                           <div className="text-[8px] text-amber-600 text-right mt-0.5">
-                            Max: {productionAvailable}
+                            Max: {productionAvailable.toFixed(2)}
                           </div>
                         )}
                       </td>
                       <td className="p-2 sm:p-3 font-semibold text-right bg-gray-50 text-sm">
-                        {total}
+                        {total.toFixed(2)}
                       </td>
                       <td className="p-1 sm:p-2">
                         <input
@@ -840,7 +840,7 @@ export default function KitchenDailyInventoryPage() {
                         />
                       </td>
                       <td className="p-2 sm:p-3 font-bold text-right text-blue-600 bg-blue-50 text-sm">
-                        {item.salesDeduction}
+                        {item.salesDeduction?.toFixed(2)}
                       </td>
                     </tr>
                   );
