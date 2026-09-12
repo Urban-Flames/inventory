@@ -581,7 +581,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 
 
-{/* EXPENSES SECTION */}
+{/* EXPENSES SECTIONs */}
 <SidebarGroup>
   <SidebarGroupLabel>Expenses</SidebarGroupLabel>
   <SidebarMenu>
